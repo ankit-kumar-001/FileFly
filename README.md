@@ -1,51 +1,196 @@
-# FileFly
+# FileFly ✈️
 
-Just a simple way to share files securely. Upload a file, get a code, share the code. That's it.
+> A fast, minimal, passcode-based file sharing web application.
 
+FileFly lets you transfer files quickly without creating accounts, generating complex download links, or navigating bloated interfaces. Simply upload a file, receive a **6-digit PIN**, and share the code with the recipient.
 
-## How it works
-1. **Upload**: Pick a file and we'll give you a 6-digit code.
-2. **Share**: Send that code to someone.
-3. **Receive**: They pop the code in and download the file.
+---
 
-Files expire in 10 minutes, so be quick!
+## 📸 How It Works
 
-## Stuff under the hood
-I built this with a few solid tools to keep it fast and simple:
-- **Node.js & Express** for the backend.
-- **PostgreSQL** to keep track of the files.
-- **Redis** to handle rate limiting (super important so the server doesn't crash).
-
-Speaking of rate limiting, I've set it up so you can't go crazy with downloads. It's capped at **30 downloads per hour** per IP address. Just enough for normal use, but keeps the bots away.
-
-## Running it locally
-
-If you want to spin this up yourself, here's the drill:
-
-**Docker (recommended)**
-```bash
-docker compose up --build
 ```
-Then open `http://localhost:3001`.
-
-**1. Prereqs**
-Make sure you have Node, Postgres, and Redis installed.
-
-**2. Setup the DB**
-```bash
-psql -d <your_database> -f backend/schema.sql
+ 📤 Sender                         ⚙️ FileFly Backend                        📥 Receiver
+┌─────────┐   1. Upload File     ┌─────────────────────┐   3. Input Code   ┌──────────┐
+│ User A  │ ───────────────────► │ Express / Multer    │ ◄──────────────── │  User B  │
+└─────────┘                      └──────────┬──────────┘                   └──────────┘
+                                            │
+                                 2. Save File & DB Record
+                                 Generate 6-digit PIN (10m TTL)
 ```
 
-**3. Configure**
-Copy the example environment file:
-```bash
-cp .env.example .env
+1. **Upload**: Select any file (up to 10MB). FileFly stores the payload and generates a unique **6-digit passcode**.
+2. **Share**: Send the 6-digit code to your recipient.
+3. **Receive**: The receiver inputs the code on the web interface to instantly download the file.
+4. **Auto-Expire**: Transfer links automatically expire after **10 minutes** or upon hitting download limits.
+
+---
+
+## ⚡ Key Features
+
+- **Zero Friction**: No user registration, authentication, or email verification required.
+- **Passcode Sharing**: Clean 6-digit numeric codes instead of long, ugly URLs.
+- **Auto-Expiring Files**: Enforces a strict 10-minute expiration window for privacy and storage hygiene.
+- **IP Rate Limiting**: Built-in Redis sliding window rate limiter (**30 downloads/hr per IP**) to safeguard against abuse and automated scraping.
+- **Relational Metadata**: PostgreSQL tracks file metadata, MIME types, transfer states, download counts, and expiration timestamps.
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technology | Description |
+| :--- | :--- | :--- |
+| **Backend API** | Node.js, Express | RESTful routes, file streaming, and static asset serving |
+| **Database** | PostgreSQL | Persistent relational store for file and transfer metadata |
+| **Cache & Rate Limiting** | Redis (`ioredis`) | In-memory store handling IP download rate limits |
+| **File Handling** | Multer | Multipart/form-data middleware for handling disk uploads |
+| **Frontend** | HTML5, CSS3, JavaScript | Lightweight zero-dependency client UI |
+| **Deployment** | Docker | Production container image configuration |
+
+---
+
+## 📁 Project Structure
+
+```text
+FileFly/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/    # Upload and download request logic
+│   │   ├── middleware/     # Redis rate limiter middleware
+│   │   ├── routes/         # API endpoint definitions
+│   │   ├── db.js           # PostgreSQL connection pool
+│   │   ├── redis.js        # Redis connection instance
+│   │   └── server.js       # App entry point & static file server
+│   ├── schema.sql          # PostgreSQL table definitions
+│   ├── Dockerfile          # Docker container configuration
+│   └── .env.example        # Environment variable template
+├── frontend/
+│   ├── index.html          # Clean client interface
+│   ├── script.js           # UI interaction and API fetch calls
+│   └── style.css           # UI layout and styling
+└── README.md
 ```
-Start Redis first (`redis-server`), then run the app:
+
+---
+
+## 🔌 API Reference
+
+### Upload File
+```http
+POST /api/transfers/upload
+```
+- **Content-Type**: `multipart/form-data`
+- **Body**: `file` (Max 10MB)
+
+**Response `200 OK`**:
+```json
+{
+  "transferCode": "482910",
+  "expiresAt": "2026-10-08T19:00:00.000Z",
+  "maxDownloads": 100
+}
+```
+
+---
+
+### Download File
+```http
+GET /api/transfers/:code
+```
+- **Params**: `code` (6-digit numeric passkey)
+
+**Response**:
+- `200 OK`: File binary stream with `Content-Disposition: attachment` header
+- `404 Not Found`: Invalid or expired transfer code
+- `410 Gone`: Expiration timestamp passed
+- `429 Too Many Requests`: Rate limit reached (30 downloads/hr per IP)
+
+---
+
+## 🚀 Getting Started
+
+### Option 1: Docker (Recommended)
+
+Build and run using Docker:
+
+```bash
+docker build -t filefly -f backend/Dockerfile .
+docker run -p 3001:3001 --env-file backend/.env filefly
+```
+
+Visit `http://localhost:3001`.
+
+---
+
+### Option 2: Local Setup
+
+#### Prerequisites
+- **Node.js** (v18+)
+- **PostgreSQL**
+- **Redis**
+
+#### 1. Configuration
+Navigate to the backend directory and set up environment variables:
+
 ```bash
 cd backend
+cp .env.example .env
+```
+
+Example `.env`:
+```env
+PORT=3001
+DATABASE_URL=postgresql://user:password@localhost:5432/filefly
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+FRONTEND_URL=*
+```
+
+#### 2. Database Initialization
+Run the database schema script:
+
+```bash
+psql -d filefly -f schema.sql
+```
+
+#### 3. Run the App
+Start Redis (`redis-server`), then launch the Node server:
+
+```bash
 npm install
 npm start
 ```
 
-Head over to `http://localhost:3001` and try sending something.
+Open `http://localhost:3001` in your browser.
+
+---
+
+## 📊 Database Schema
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE files (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  original_name TEXT NOT NULL,
+  stored_name TEXT NOT NULL,
+  mime_type TEXT,
+  size BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE transfers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  file_id UUID REFERENCES files(id) ON DELETE CASCADE,
+  transfer_code VARCHAR(6) UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  downloads INT DEFAULT 0,
+  max_downloads INT DEFAULT 1,
+  is_active BOOLEAN DEFAULT true
+);
+```
+
+---
+
+## 📄 License
+
+[ISC](LICENSE)
