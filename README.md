@@ -30,6 +30,7 @@ FileFly lets you transfer files quickly without creating accounts, generating co
 - **Zero Friction**: No user registration, authentication, or email verification required.
 - **Passcode Sharing**: Clean 6-digit numeric codes instead of long, ugly URLs.
 - **Auto-Expiring Files**: Enforces a strict 10-minute expiration window for privacy and storage hygiene.
+- **Malware & File Sanitization**: Multi-layer security layer against dangerous uploads — client-side checks, extension and MIME blocklisting, double-extension cloaking protection, Unicode RLO/path traversal neutralization, and deep magic-byte inspection (PE, ELF, Mach-O, scripts) with automatic server disk purging.
 - **IP Rate Limiting**: Built-in Redis sliding window rate limiter (**30 downloads/hr per IP**) to safeguard against abuse and automated scraping.
 - **Relational Metadata**: PostgreSQL tracks file metadata, MIME types, transfer states, download counts, and expiration timestamps.
 
@@ -42,9 +43,9 @@ FileFly lets you transfer files quickly without creating accounts, generating co
 | **Backend API** | Node.js, Express | RESTful routes, file streaming, and static asset serving |
 | **Database** | PostgreSQL | Persistent relational store for file and transfer metadata |
 | **Cache & Rate Limiting** | Redis (`ioredis`) | In-memory store handling IP download rate limits |
+| **Security & Sanitization** | Custom Middleware | File extension/MIME validation, magic-byte inspection & filename cleansing |
 | **File Handling** | Multer | Multipart/form-data middleware for handling disk uploads |
 | **Frontend** | HTML5, CSS3, JavaScript | Lightweight zero-dependency client UI |
-| **Deployment** | Docker | Production container image configuration |
 
 ---
 
@@ -55,13 +56,12 @@ FileFly/
 ├── backend/
 │   ├── src/
 │   │   ├── controllers/    # Upload and download request logic
-│   │   ├── middleware/     # Redis rate limiter middleware
+│   │   ├── middleware/     # Redis rate limiter & file sanitization middleware
 │   │   ├── routes/         # API endpoint definitions
 │   │   ├── db.js           # PostgreSQL connection pool
 │   │   ├── redis.js        # Redis connection instance
 │   │   └── server.js       # App entry point & static file server
 │   ├── schema.sql          # PostgreSQL table definitions
-│   ├── Dockerfile          # Docker container configuration
 │   └── .env.example        # Environment variable template
 ├── frontend/
 │   ├── index.html          # Clean client interface
@@ -108,20 +108,7 @@ GET /api/transfers/:code
 
 ## 🚀 Getting Started
 
-### Option 1: Docker (Recommended)
-
-Build and run using Docker:
-
-```bash
-docker build -t filefly -f backend/Dockerfile .
-docker run -p 3001:3001 --env-file backend/.env filefly
-```
-
-Visit `http://localhost:3001`.
-
----
-
-### Option 2: Local Setup
+### Local Setup
 
 #### Prerequisites
 - **Node.js** (v18+)

@@ -14,7 +14,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const app = express();
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: process.env.FRONTEND_URL ,
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -50,6 +50,16 @@ process.on('SIGINT', () => {
 
 
 app.use((err, req, res, next) => {
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "File too large. Maximum size allowed is 10MB." });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  if (err.statusCode || err.status) {
+    return res.status(err.statusCode || err.status).json({ error: err.message });
+  }
   console.error("Internal Server Error:", err);
   res.status(500).json({ error: "Something went wrong! details: " + err.message });
 });
+

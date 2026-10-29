@@ -2,22 +2,46 @@ import multer from "multer";
 import { nanoid } from "nanoid";
 import pool from "../db.js";
 import path from "path";
+import crypto from "node:crypto";
+import {
+  multerFileFilter,
+  sanitizeUploadedFile,
+  safelyDeleteFile
+} from "../middleware/fileSanitizer.js";
+
+const MAX_ALLOWED_SIZE = 10 * 1024 * 1024 ; // 10MB 
 
 const upload = multer({
   dest: "uploads/",
   limits: {
-    fileSize: 10 * 1024 * 1024 
-  } 
+    fileSize: MAX_ALLOWED_SIZE
+  },
+  fileFilter: multerFileFilter
 });
 
-
 export const uploadFile = [
-  upload.single("file"),
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ error: "File too large. Maximum size allowed is 10MB." });
+        }
+        return res.status(400).json({ error: err.message || "File upload failed." });
+      }
+      next();
+    });
+  },
+  sanitizeUploadedFile,
   async (req, res) => {
     try {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      if (!req.file) {
+        return res.status(400).json({ error: "Please select a file to upload." });
+      }
+
+      const code = crypto.randomInt(100000, 1000000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       const maxDownloads = 100;
+
       const fileResult = await pool.query(
         `INSERT INTO files (original_name, stored_name, mime_type, size)
          VALUES ($1,$2,$3,$4) RETURNING id`,
@@ -41,6 +65,9 @@ export const uploadFile = [
         maxDownloads
       });
     } catch (err) {
+      if (req.file?.path) {
+        await safelyDeleteFile(req.file.path);
+      }
       res.status(500).json({ error: err.message });
     }
   }
@@ -60,7 +87,7 @@ export const downloadFile = async (req, res) => {
 
     if (result.rows.length === 0)
       return res.status(404).json({ message: "Invalid or expired code" });
-
+    
     const transfer = result.rows[0];
 
     if (new Date() > transfer.expires_at)
@@ -74,9 +101,11 @@ export const downloadFile = async (req, res) => {
       [transfer.id]
     );
 
-
-    const safeFilename = encodeURIComponent(transfer.original_name);  
-    res.setHeader('Content-Disposition', `attachment; filename="${transfer.original_name}"; filename*=UTF-8''${safeFilename}`);
+    const safeFilename = encodeURIComponent(transfer.original_name);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${transfer.original_name}"; filename*=UTF-8''${safeFilename}`
+    );
     res.sendFile(path.resolve(`uploads/${transfer.stored_name}`));
   } catch (err) {
     res.status(500).json({ error: err.message });

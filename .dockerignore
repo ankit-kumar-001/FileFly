@@ -1,8 +1,0 @@
-node_modules
-backend/node_modules
-uploads
-backend/uploads
-.git
-.DS_Store
-npm-debug.log
-yarn-error.log
