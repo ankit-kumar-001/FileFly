@@ -268,6 +268,15 @@ export async function safelyDeleteFile(filePath) {
   }
 }
 
+export async function safelyDeleteAllFiles(files) {
+  if (!files || !Array.isArray(files)) return;
+  for (const file of files) {
+    if (file?.path) {
+      await safelyDeleteFile(file.path);
+    }
+  }
+}
+
 /**
  * Multer file filter to reject obviously dangerous files before writing to disk.
  */
@@ -275,7 +284,7 @@ export const multerFileFilter = (req, file, cb) => {
   // 1. Check filename
   const filenameCheck = validateFilenameSecurity(file.originalname);
   if (!filenameCheck.safe) {
-    const err = new Error(filenameCheck.reason);
+    const err = new Error(`File '${file.originalname}' rejected: ${filenameCheck.reason}`);
     err.code = "MALWARE_DETECTED";
     err.statusCode = 400;
     return cb(err, false);
@@ -284,7 +293,7 @@ export const multerFileFilter = (req, file, cb) => {
   // 2. Check reported MIME type
   const mimeType = (file.mimetype || "").toLowerCase().trim();
   if (DANGEROUS_MIME_TYPES.has(mimeType)) {
-    const err = new Error(`File type '${mimeType}' is blocked for security reasons.`);
+    const err = new Error(`File '${file.originalname}' rejected: File type '${mimeType}' is blocked for security reasons.`);
     err.code = "MALWARE_DETECTED";
     err.statusCode = 400;
     return cb(err, false);
@@ -294,51 +303,69 @@ export const multerFileFilter = (req, file, cb) => {
 };
 
 /**
- * Middleware executed after multer has stored the file.
- * Performs deep file content inspection and filename sanitization.
+ * Middleware executed after multer has stored the file(s).
+ * Performs deep file content inspection and filename sanitization on all uploaded files.
  */
 export const sanitizeUploadedFile = async (req, res, next) => {
+  let files = req.normalizedFiles;
+  if (!files) {
+    if (req.files) {
+      files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+    } else if (req.file) {
+      files = [req.file];
+    } else {
+      files = [];
+    }
+  }
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Please select a file to upload." });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "Please select at least one file to upload." });
     }
 
-    const filePath = req.file.path;
+    for (const file of files) {
+      const filePath = file.path;
 
-    // 1. Validate and sanitize original filename
-    const nameCheck = validateFilenameSecurity(req.file.originalname);
-    if (!nameCheck.safe) {
-      await safelyDeleteFile(filePath);
-      return res.status(400).json({ error: nameCheck.reason });
+      // 1. Validate and sanitize original filename
+      const nameCheck = validateFilenameSecurity(file.originalname);
+      if (!nameCheck.safe) {
+        await safelyDeleteAllFiles(files);
+        return res.status(400).json({ error: `File '${file.originalname}' rejected: ${nameCheck.reason}` });
+      }
+
+      // Set sanitized filename for storage/database
+      file.originalname = nameCheck.sanitizedName;
+
+      // 2. Check reported MIME type
+      const mimeType = (file.mimetype || "").toLowerCase().trim();
+      if (DANGEROUS_MIME_TYPES.has(mimeType)) {
+        await safelyDeleteAllFiles(files);
+        return res.status(400).json({
+          error: `File '${file.originalname}' rejected: File type '${mimeType}' is blocked for security reasons.`
+        });
+      }
+
+      // 3. Deep inspection of magic bytes
+      const contentCheck = await detectMaliciousContent(filePath);
+      if (contentCheck.isMalicious) {
+        await safelyDeleteAllFiles(files);
+        return res.status(400).json({
+          error: `File '${file.originalname}' rejected: ${contentCheck.reason}`
+        });
+      }
     }
 
-    // Set sanitized filename for database storage and downloads
-    req.file.originalname = nameCheck.sanitizedName;
-
-    // 2. Check reported MIME type
-    const mimeType = (req.file.mimetype || "").toLowerCase().trim();
-    if (DANGEROUS_MIME_TYPES.has(mimeType)) {
-      await safelyDeleteFile(filePath);
-      return res.status(400).json({
-        error: `File type '${mimeType}' is blocked for security reasons.`
-      });
+    req.validatedFiles = files;
+    if (files.length === 1) {
+      req.file = files[0];
     }
-
-    // 3. Deep inspection of magic bytes
-    const contentCheck = await detectMaliciousContent(filePath);
-    if (contentCheck.isMalicious) {
-      await safelyDeleteFile(filePath);
-      return res.status(400).json({
-        error: `File upload rejected: ${contentCheck.reason}`
-      });
-    }
-
     next();
   } catch (error) {
-    if (req.file?.path) {
-      await safelyDeleteFile(req.file.path);
+    if (files && files.length > 0) {
+      await safelyDeleteAllFiles(files);
     }
     console.error("Sanitization middleware error:", error);
     return res.status(500).json({ error: "File sanitization failed." });
   }
 };
+

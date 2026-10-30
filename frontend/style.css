@@ -15,7 +15,7 @@ body {
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     width: 100%;
-    max-width: 350px;
+    max-width: 380px;
     text-align: center;
     border: 1px solid #e2e8f0;
 }
@@ -23,7 +23,6 @@ body {
 h1 {
     margin-bottom: 30px;
     color: #007bff;
-   
 }
 
 h3 {
@@ -87,6 +86,79 @@ button:disabled {
     border-radius: 8px;
     margin-top: 10px;
     color: #007bff;
+}
+
+.file-summary {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #475569;
+    text-align: left;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.download-area {
+    margin-top: 15px;
+    text-align: left;
+}
+
+.download-area-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 8px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.file-info {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #1e293b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-size {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.file-dl-btn {
+    width: auto;
+    padding: 5px 10px;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.dl-all-btn {
+    margin-top: 8px;
+    background-color: #10b981;
+}
+
+.dl-all-btn:hover {
+    background-color: #059669;
 }
 
 .hidden {

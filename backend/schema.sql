@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS transfers (
   transfer_code VARCHAR(6) UNIQUE NOT NULL,
   expires_at TIMESTAMP NOT NULL,
   downloads INT DEFAULT 0,
-  max_downloads INT DEFAULT 1,
-  is_active BOOLEAN DEFAULT true
+  max_downloads INT DEFAULT 100,
+  is_active BOOLEAN DEFAULT true,
+  file_count INT DEFAULT 1,
+  files_metadata JSONB DEFAULT '[]'::jsonb,
+  is_zipped BOOLEAN DEFAULT true
 );
+
+-- Migration helpers for existing databases
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS file_count INT DEFAULT 1;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS files_metadata JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS is_zipped BOOLEAN DEFAULT true;

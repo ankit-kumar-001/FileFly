@@ -13,8 +13,9 @@
         <h1>FileFly</h1>
 
         <div class="section">
-            <h3>Send a File</h3>
-            <input type="file" id="fileInput">
+            <h3>Send Files</h3>
+            <input type="file" id="fileInput" multiple>
+            <div id="fileSummary" class="file-summary hidden"></div>
             <button id="sendBtn">Upload & Get Code</button>
             <div id="resultArea" class="hidden">
                 <p>Share this code:</p>
@@ -24,9 +25,10 @@
 
         <div class="divider">or</div>
         <div class="section">
-            <h3>Receive a File</h3>
+            <h3>Receive Files</h3>
             <input type="text" id="receiveCode" placeholder="6-digit code" maxlength="6">
             <button id="receiveBtn">Download File</button>
+            <div id="downloadArea" class="download-area hidden"></div>
         </div>
     </div>
     <script src="script.js"></script>
